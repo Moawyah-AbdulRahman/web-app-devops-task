@@ -6,7 +6,7 @@ import os
 
 app = Flask(__name__)
 
-DATABASE_URL = 'postgresql://admin:admin@172.17.0.2/db'
+DATABASE_URL = 'postgresql://admin:admin@database:5432/db'
 
 # Function to establish a database connection
 def get_db():
