@@ -1,0 +1,43 @@
+---
+- name: Setup Postgres on DB Servers
+  hosts: database_servers
+  become: true
+  vars:
+    postgres_version: "13"
+    allowed_ip: "{{ lookup('env', 'FRONTEND_IP') }}"
+
+  
+  tasks:
+    - name: Add PostgreSQL APT GPG key
+      apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: Add PostgreSQL APT repository
+      apt_repository:
+        repo: "deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main {{ postgres_version }}"
+        state: present
+
+    - name: Install PostgreSQL and related packages
+      apt:
+        name: ['postgresql-{{ postgres_version }}', 'postgresql-client-{{ postgres_version }}']
+        state: present
+    
+    - name: Listen to Frontnd IP
+      ansible.builtin.lineinfile:
+        path: /etc/postgresql/{{ postgres_version }}/main/postgresql.conf
+        regexp: '^#*listen_addresses.*'
+        line: "listen_addresses = '*'"
+      notify: Restart PostgreSQL
+
+    - name: Accept From Frontend IP
+      ansible.builtin.lineinfile:
+        path: /etc/postgresql/{{ postgres_version }}/main/pg_hba.conf
+        regexp: '^host\s+all\s+all\s+0\.0\.0\.0/0\s+md5'
+        line: 'host    all             all             {{ allowed_ip }}/32         md5'
+
+  handlers:
+    - name: Restart PostgreSQL
+      ansible.builtin.systemd:
+        name: postgresql
+        state: restarted

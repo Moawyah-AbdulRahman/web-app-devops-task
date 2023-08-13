@@ -1,0 +1,45 @@
+---
+- name: Deoploy Frontend App
+  hosts: frontend_servers
+  become: true
+
+  tasks:
+    - name: Update Apt
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Upgrade Apt
+      ansible.builtin.apt:
+        upgrade: yes
+
+    - name: Install Python 3 and pip3
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Copy Project
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: /opt/app/
+      loop:
+        - { src: "{{ playbook_dir }}/../app.py" }
+        - { src: "{{ playbook_dir }}/../templates" }
+        - { src: "{{ playbook_dir }}/../requirements.txt" }
+      become: true
+
+    - name: Install packages from requirements.txt
+      ansible.builtin.pip:
+        requirements: /opt/app/requirements.txt
+
+    - name: Run Flask App
+      ansible.builtin.command: nohup python3 /opt/app/app.py > /opt/app/app.log 2>&1 &
+      become: true
+      async: 0
+      poll: 0
+      environment:
+        DB_IP: "{{ lookup('env', 'DB_IP') }}"
+        DB_PASSWORD: "{{ lookup('env', 'DB_PASSWORD') }}"
+
+

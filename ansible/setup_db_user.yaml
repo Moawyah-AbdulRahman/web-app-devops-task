@@ -1,0 +1,64 @@
+---
+- name: Setup Postgres on DB Servers
+  hosts: database_servers
+  become: true
+  vars:
+    db_name: db
+    db_user: admin
+    db_password: "{{ lookup('env', 'DB_PASSWORD') }}"
+
+  tasks:
+  
+    - name: Install acl package
+      apt:
+        name: acl
+        state: present
+
+    - name: Utilities Install
+      ansible.builtin.package:
+        name: python3-psycopg2
+        state: present
+    
+    - name: Create PostgreSQL User
+      community.postgresql.postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        state: present 
+      become: true
+      become_user: postgres
+
+    - name: Create PostgreSQL database
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        owner: "{{ db_user }}"
+      become: true
+      become_user: postgres
+
+    - name: Grant User Roles
+      community.postgresql.postgresql_privs:
+        type: database
+        database: "{{ db_name }}"
+        roles: "{{ db_user }}"
+        privs: all
+        grant_option: false
+      become: true
+      become_user: postgres
+
+    - name: Allow md5 Connection
+      community.postgresql.postgresql_pg_hba:
+        dest: "~/data/pg_hba.conf"
+        databases: all
+        method: md5
+        users: "{{ db_user }}"
+        address: "{{ hostvars[item]['ansible_host'] }}/32"
+        create: true
+      loop: "{{ groups['frontend_servers'] }}"
+      become: true
+      become_user: postgres
+      notify: Restart Postgresql Service
+
+  handlers:
+    - name: Restart.service
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
